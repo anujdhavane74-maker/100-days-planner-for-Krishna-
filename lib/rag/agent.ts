@@ -2,11 +2,14 @@ import { buildStaticKnowledgeBase } from './chunker';
 import { HybridRetriever } from './hybrid';
 import { CrossEncoderReranker } from './reranker';
 import { DocumentChunk, RAGResponse, UserContextData } from './types';
+import { classifyQueryIntent } from './intent';
+import { PersonalityEngine } from './personality';
 
 // Singleton knowledge base and retriever
 let cachedChunks: DocumentChunk[] | null = null;
 let cachedRetriever: HybridRetriever | null = null;
 const reranker = new CrossEncoderReranker();
+const personalityEngine = new PersonalityEngine();
 
 export function getRetriever(): { chunks: DocumentChunk[]; retriever: HybridRetriever } {
   if (!cachedChunks || !cachedRetriever) {
@@ -22,9 +25,19 @@ export class RAGGrowthAgent {
     userContext?: Partial<UserContextData>
   ): Promise<RAGResponse> {
     const startTime = Date.now();
+
+    // 1. Fast Industry-Level Intent Classification
+    const intentResult = classifyQueryIntent(userQuery);
+
+    // 2. Handle Non-Curriculum Conversational Intents (Greetings, Emotional checkins, Motivation, Progress, Identity)
+    if (intentResult.intent !== 'curriculum_query') {
+      return this.handleConversationalQuery(userQuery, intentResult, userContext, startTime);
+    }
+
+    // 3. Curriculum Retrieval Pipeline (Hybrid BM25 + Dense + Cross-Encoder Reranker)
     const { chunks, retriever } = getRetriever();
 
-    // 1. Inject dynamic user context into temporary query chunks if present
+    // Inject dynamic user context into temporary query chunks if present
     let dynamicChunks = [...chunks];
     if (userContext?.recentNotes && userContext.recentNotes.length > 0) {
       userContext.recentNotes.forEach((n, idx) => {
@@ -42,18 +55,15 @@ export class RAGGrowthAgent {
       });
     }
 
-    // 2. Hybrid Retrieval (BM25 + Dense Vector Search)
     const activeRetriever = dynamicChunks.length > chunks.length
       ? new HybridRetriever(dynamicChunks)
       : retriever;
 
     const candidates = activeRetriever.retrieve(userQuery, 14);
-
-    // 3. Cross-Encoder Reranking
     const topCandidates = reranker.rerank(userQuery, candidates, 5);
     const citations = reranker.extractCitations(topCandidates);
 
-    // 4. Build Context String
+    // Build Context String
     const contextText = topCandidates
       .map((c, i) => `[Source ${i + 1}] (${c.chunk.metadata.source}):\n${c.chunk.content}`)
       .join('\n\n');
@@ -66,7 +76,7 @@ export class RAGGrowthAgent {
 - Current Focus: ${userContext.currentFocus || 'Daily Practice'} (${userContext.suggestedMinutes || 60} min)`
       : '';
 
-    // 5. Try Gemini LLM, OpenAI LLM, or Fallback Grounded Synthesizer
+    // LLM or Offline Grounded Synthesizer
     let answer = '';
     let engine: RAGResponse['engine'] = 'grounded_synthesis';
 
@@ -152,15 +162,128 @@ Question: ${userQuery}`;
       engine = 'grounded_synthesis';
     }
 
-    const executionTimeMs = Date.now() - startTime;
-
     return {
       answer,
       citations,
       retrievedCount: candidates.length,
       rerankedCount: topCandidates.length,
-      executionTimeMs,
-      engine
+      executionTimeMs: Date.now() - startTime,
+      engine,
+      intent: intentResult.intent
+    };
+  }
+
+  /**
+   * Handles conversational gestures (greetings, emotional checkins, motivation, small talk)
+   * with human-like warmth, empathy, and context awareness.
+   */
+  private async handleConversationalQuery(
+    query: string,
+    intentResult: ReturnType<typeof classifyQueryIntent>,
+    userContext: Partial<UserContextData> | undefined,
+    startTime: number
+  ): Promise<RAGResponse> {
+    let answer = '';
+    let engine: RAGResponse['engine'] = 'conversational_engine';
+
+    // If an LLM is available, give it an emotionally intelligent prompt
+    const geminiKey = process.env.GEMINI_API_KEY;
+    const openAiKey = process.env.OPENAI_API_KEY;
+
+    if (geminiKey || openAiKey) {
+      const recentMoodStr = userContext?.recentNotes?.length
+        ? `Last journal note (${userContext.recentNotes[0].date}): "${userContext.recentNotes[0].note}", Mood: ${userContext.recentNotes[0].mood}/5, Win: "${userContext.recentNotes[0].win}"`
+        : 'No journal reflections logged yet';
+
+      const conversationalPrompt = `You are the MV33 AI Growth Coach for Krishna's 100-Day Growth System.
+Personality: Warm, deeply human, empathetic, direct, and inspired by Max Verstappen (calm, disciplined, supportive, no corporate fluff).
+User info:
+- Name: Krishna
+- Current day: Day ${userContext?.dayNo || 1} of 100
+- Active streak: ${userContext?.currentStreak || 0} days
+- Gym consistency: ${userContext?.gymCount || 0} sessions
+- Today's focus: ${userContext?.currentFocus || 'Daily Practice'} (${userContext?.suggestedMinutes || 60} min)
+- Recent journal: ${recentMoodStr}
+- Detected intent: ${intentResult.intent}
+
+INSTRUCTIONS:
+1. Respond naturally to the user's gesture or feeling.
+2. If the user asks how you are, how your day is, or if you feel low: answer warmly as a coach who is locked in, but quickly pivot to asking how Krishna is feeling and acknowledge his current journey state.
+3. If the user feels low, tired, or unmotivated: respond with profound empathy. Acknowledge that low days on a 100-day sprint are normal, encourage lowering the barrier (e.g. 10 mins of After Effects or a quick 30-min gym walk), and protect the streak.
+4. Keep the response concise, punchy, and human. Use formatting like bullet points only when helpful.`;
+
+      if (geminiKey) {
+        try {
+          const res = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{ role: 'user', parts: [{ text: `${conversationalPrompt}\n\nUser message: "${query}"` }] }],
+                generationConfig: { temperature: 0.6, maxOutputTokens: 600 }
+              })
+            }
+          );
+          if (res.ok) {
+            const json: any = await res.json();
+            const text = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (text && text.trim().length > 0) {
+              answer = text.trim();
+              engine = 'gemini';
+            }
+          }
+        } catch {
+          // Fall through
+        }
+      }
+
+      if (!answer && openAiKey) {
+        try {
+          const res = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${openAiKey}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              model: 'gpt-4o-mini',
+              messages: [
+                { role: 'system', content: conversationalPrompt },
+                { role: 'user', content: query }
+              ],
+              temperature: 0.6,
+              max_tokens: 600
+            })
+          });
+          if (res.ok) {
+            const json: any = await res.json();
+            const text = json?.choices?.[0]?.message?.content;
+            if (text && text.trim().length > 0) {
+              answer = text.trim();
+              engine = 'openai';
+            }
+          }
+        } catch {
+          // Fall through
+        }
+      }
+    }
+
+    // Offline / deterministic Personality Engine fallback
+    if (!answer) {
+      answer = personalityEngine.generateResponse(query, intentResult, userContext);
+      engine = 'conversational_engine';
+    }
+
+    return {
+      answer,
+      citations: [],
+      retrievedCount: 0,
+      rerankedCount: 0,
+      executionTimeMs: Date.now() - startTime,
+      engine,
+      intent: intentResult.intent
     };
   }
 

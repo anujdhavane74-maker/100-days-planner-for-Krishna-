@@ -97,3 +97,4 @@ export class BM25Index {
     return results.slice(0, topK);
   }
 }
+

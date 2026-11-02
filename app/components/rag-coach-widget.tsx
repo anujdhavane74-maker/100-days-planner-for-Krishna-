@@ -25,6 +25,9 @@ interface ChatMessage {
 }
 
 const QUICK_PROMPTS = [
+  "Hey coach, how are you feeling today?",
+  "I'm feeling low today, need some guidance",
+  "How is my streak and progress holding up?",
   "What is my daily focus and target learning time today?",
   "How do I link GEOlayers 3 with an After Effects 3D Camera?",
   "Explain an n8n automated media pipeline for my video edits.",

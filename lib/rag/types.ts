@@ -7,6 +7,16 @@ export type ChunkType =
   | 'journal'
   | 'technical_guide';
 
+export type QueryIntent =
+  | 'greeting'
+  | 'checkin_ai'
+  | 'emotional_user'
+  | 'motivational'
+  | 'progress_review'
+  | 'identity_capabilities'
+  | 'small_talk'
+  | 'curriculum_query';
+
 export interface DocumentChunk {
   id: string;
   content: string;
@@ -59,5 +69,7 @@ export interface RAGResponse {
   retrievedCount: number;
   rerankedCount: number;
   executionTimeMs: number;
-  engine: 'gemini' | 'openai' | 'grounded_synthesis';
+  engine: 'gemini' | 'openai' | 'grounded_synthesis' | 'conversational_engine';
+  intent?: QueryIntent;
 }
+
