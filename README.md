@@ -127,6 +127,34 @@ When using the Sites plugin, follow its skill instructions for installation, bui
 
 The portable build runs Vinext directly without a host `timeout` command. The managed-linux build uses `scripts/build-verified.sh` and its existing `SITES_BUILD_TIMEOUT` setting.
 
+## Cross-Device Sync (Mobile & PC) on Vercel
+
+The personalized 100-Day Growth System supports seamless synchronization between your Mobile phone (Safari / Chrome / Add to Home Screen) and your PC / Mac.
+
+### 1. How Authentication Works
+- **Inside OpenAI ChatGPT Canvas / Sites**: Native dispatch headers (`oai-authenticated-user-id`, etc.) are recognized automatically.
+- **On Vercel / Web Browser**: The system uses a secure 1-year cross-device session cookie (`growth_auth_session`).
+- **1-Click Phone & PC Login**: Simply click **"Sign in with ChatGPT to save your progress →"** (or visit `/signin-with-chatgpt?return_to=/`) on both your PC and your phone. Both devices link to the same account (`krishna_growth_space`).
+- **Sign Out**: Click the sign out icon in the left sidebar or visit `/signout-with-chatgpt?return_to=/`.
+
+### 2. Multi-Device Real-Time Cloud Persistence
+Vercel serverless functions run in isolated, ephemeral containers. To ensure that progress saved from your phone is immediately visible on your PC in real time, connect one of the following free cloud databases:
+
+- **Option A: Turso libSQL Cloud (Recommended - Free SQLite)**
+  1. Create a free database at [Turso](https://turso.tech) (`turso db create krishna-growth`).
+  2. In your Vercel Project Settings → Environment Variables, add:
+     - `TURSO_DATABASE_URL`: `https://krishna-growth-[your-org].turso.io`
+     - `TURSO_AUTH_TOKEN`: your Turso JWT token.
+- **Option B: Vercel KV / Upstash Redis (1-Click Integration)**
+  1. In your Vercel Project Dashboard, open the **Storage** tab.
+  2. Click **Create Database** → **KV (Upstash Redis)**.
+  3. Vercel automatically configures `KV_REST_API_URL` and `KV_REST_API_TOKEN`.
+
+### 3. Client Offline Cache & Instant Transfer
+Even without cloud database variables configured:
+- Your progress is automatically mirrored in browser `localStorage`.
+- Use the **"Sync Mobile & PC"** button in the header or the **Export/Import Journey** button to transfer progress offline at any time.
+
 ## Learn More
 
 - [vinext Documentation](https://github.com/cloudflare/vinext)

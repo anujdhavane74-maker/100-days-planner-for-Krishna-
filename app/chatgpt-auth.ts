@@ -1,4 +1,4 @@
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 export type ChatGPTUser = {
@@ -14,37 +14,86 @@ const USER_FULL_NAME_HEADER = "oai-authenticated-user-full-name";
 const USER_FULL_NAME_ENCODING_HEADER =
   "oai-authenticated-user-full-name-encoding";
 const PERCENT_ENCODED_UTF8 = "percent-encoded-utf-8";
-const SIGN_IN_PATH = "/signin-with-chatgpt";
-const SIGN_OUT_PATH = "/signout-with-chatgpt";
-const CALLBACK_PATH = "/callback";
+
+export const SIGN_IN_PATH = "/signin-with-chatgpt";
+export const SIGN_OUT_PATH = "/signout-with-chatgpt";
+export const SESSION_COOKIE_NAME = "growth_auth_session";
+export const LOCAL_DEV_COOKIE = "__sites_local_auth";
+
+export const DEFAULT_FRIEND_USER: ChatGPTUser = {
+  userId: "krishna_growth_space",
+  displayName: "Krishna",
+  email: "krishna@growth.space",
+  fullName: "Krishna",
+};
+
+export function encodeSessionUser(user: ChatGPTUser): string {
+  return Buffer.from(JSON.stringify(user), "utf8").toString("base64url");
+}
+
+export function decodeSessionUser(cookieVal: string): ChatGPTUser | null {
+  try {
+    const raw = Buffer.from(cookieVal, "base64url").toString("utf8");
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed.userId === "string") {
+      return {
+        userId: parsed.userId,
+        displayName: parsed.displayName || parsed.email || "Krishna",
+        email: parsed.email || "krishna@growth.space",
+        fullName: parsed.fullName || null,
+      };
+    }
+  } catch {
+    // Malformed session cookie
+  }
+  return null;
+}
 
 export async function getChatGPTUser(): Promise<ChatGPTUser | null> {
-  const requestHeaders = await headers();
-  const userId = requestHeaders.get(USER_ID_HEADER);
-  const email = requestHeaders.get(USER_EMAIL_HEADER);
-  if (userId && email) {
-    const encodedFullName = requestHeaders.get(USER_FULL_NAME_HEADER);
-    const fullName =
-      encodedFullName &&
-      requestHeaders.get(USER_FULL_NAME_ENCODING_HEADER) === PERCENT_ENCODED_UTF8
-        ? safeDecodeURIComponent(encodedFullName)
-        : null;
+  // 1. OpenAI ChatGPT Platform Dispatch (when hosted inside ChatGPT Canvas/Sites)
+  try {
+    const requestHeaders = await headers();
+    const userId = requestHeaders.get(USER_ID_HEADER);
+    const email = requestHeaders.get(USER_EMAIL_HEADER);
+    if (userId && email) {
+      const encodedFullName = requestHeaders.get(USER_FULL_NAME_HEADER);
+      const fullName =
+        encodedFullName &&
+        requestHeaders.get(USER_FULL_NAME_ENCODING_HEADER) === PERCENT_ENCODED_UTF8
+          ? safeDecodeURIComponent(encodedFullName)
+          : null;
 
-    return {
-      userId,
-      displayName: fullName ?? email,
-      email,
-      fullName,
-    };
+      return {
+        userId,
+        displayName: fullName ?? email,
+        email,
+        fullName,
+      };
+    }
+  } catch {
+    // headers() unavailable
   }
 
-  // Standalone / Vercel deployment: provide active session for the user
-  return {
-    userId: "friend_growth_space",
-    displayName: "Friend",
-    email: "friend@growth.space",
-    fullName: "Friend",
-  };
+  // 2. Cross-Device Web / Mobile / Desktop session on Vercel
+  try {
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+    if (sessionCookie) {
+      const user = decodeSessionUser(sessionCookie);
+      if (user) return user;
+    }
+
+    // 3. Vite development / loopback cookie (__sites_local_auth)
+    const devCookie = cookieStore.get(LOCAL_DEV_COOKIE)?.value;
+    if (devCookie === "1") {
+      return DEFAULT_FRIEND_USER;
+    }
+  } catch {
+    // cookies() unavailable in non-request contexts
+  }
+
+  // Unauthenticated visitors: prompt to sign in
+  return null;
 }
 
 export async function requireChatGPTUser(
@@ -85,7 +134,7 @@ function isReservedAuthPath(pathname: string): boolean {
   return (
     pathname === SIGN_IN_PATH ||
     pathname === SIGN_OUT_PATH ||
-    pathname === CALLBACK_PATH
+    pathname === "/callback"
   );
 }
 
