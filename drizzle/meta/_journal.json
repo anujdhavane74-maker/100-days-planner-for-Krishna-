@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1793561903884,
+      "tag": "0000_right_lockjaw",
+      "breakpoints": true
+    }
+  ]
+}
