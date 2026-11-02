@@ -161,6 +161,7 @@ export default function RAGCoachWidget({ signedIn }: { signedIn: boolean }) {
         <div
           role="dialog"
           aria-modal="true"
+          className="rag-coach-modal"
           style={{
             position: 'fixed',
             right: 20,
@@ -168,7 +169,7 @@ export default function RAGCoachWidget({ signedIn }: { signedIn: boolean }) {
             width: 'min(480px, calc(100vw - 40px))',
             height: 'min(640px, calc(100vh - 60px))',
             zIndex: 50,
-            background: 'rgba(10, 16, 28, 0.94)',
+            background: 'rgba(10, 16, 28, 0.96)',
             backdropFilter: 'blur(20px)',
             WebkitBackdropFilter: 'blur(20px)',
             border: '1px solid rgba(255, 135, 61, 0.3)',
@@ -232,7 +233,27 @@ export default function RAGCoachWidget({ signedIn }: { signedIn: boolean }) {
                 </small>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <a
+                href="/coach"
+                title="Open Dedicated Full-Screen AI Coach Webpage"
+                style={{
+                  background: 'rgba(255,135,61,0.15)',
+                  border: '1px solid rgba(255,135,61,0.3)',
+                  color: '#ffab72',
+                  textDecoration: 'none',
+                  fontSize: 11,
+                  fontWeight: 600,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  padding: '4px 8px',
+                  borderRadius: 6
+                }}
+              >
+                <span>Full Page</span>
+                <span style={{ fontSize: 13 }}>↗</span>
+              </a>
               <button
                 onClick={() => setMessages([messages[0]])}
                 title="Reset conversation"
@@ -512,6 +533,25 @@ export default function RAGCoachWidget({ signedIn }: { signedIn: boolean }) {
           </form>
         </div>
       )}
+
+      <style jsx global>{`
+        @media (max-width: 600px) {
+          .rag-coach-modal {
+            right: 0 !important;
+            bottom: 0 !important;
+            width: 100vw !important;
+            height: 100dvh !important;
+            border-radius: 0 !important;
+            border: none !important;
+          }
+          .rag-floating-btn {
+            left: 16px !important;
+            bottom: 16px !important;
+            padding: 10px 14px !important;
+            font-size: 13px !important;
+          }
+        }
+      `}</style>
     </>
   );
 }

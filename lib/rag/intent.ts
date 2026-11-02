@@ -131,21 +131,17 @@ export function classifyQueryIntent(rawQuery: string): IntentClassificationResul
 
   // 3. AI Check-in ("how are you", "how are you feeling", "how is your day going")
   const aiCheckinPatterns = [
-    /^how are you\b/,
-    /^how r u\b/,
-    /^how are you feeling\b/,
-    /^how r u feeling\b/,
-    /^how is your day\b/,
-    /^hows your day\b/,
-    /^how's your day\b/,
-    /^how is it going\b/,
-    /^hows it going\b/,
-    /^how's it going\b/,
-    /^how are things\b/,
-    /^are you good\b/,
-    /^are you doing well\b/,
-    /^how do you feel\b/,
-    /^what'?s up with you\b/
+    /(?:^|\b)(?:hey|hi|hello|yo)?\s*(?:there|coach|mv33|bro|man)?\s*,?\s*how\s+(?:are\s+you|r\s+u)\b/,
+    /(?:^|\b)how\s+(?:are\s+you|r\s+u)\s+feeling\b/,
+    /(?:^|\b)how\s+is\s+your\s+day\b/,
+    /(?:^|\b)how'?s\s+your\s+day\b/,
+    /(?:^|\b)how\s+is\s+it\s+going\b/,
+    /(?:^|\b)how'?s\s+it\s+going\b/,
+    /(?:^|\b)how\s+are\s+things\b/,
+    /(?:^|\b)are\s+you\s+good\b/,
+    /(?:^|\b)are\s+you\s+doing\s+well\b/,
+    /(?:^|\b)how\s+do\s+you\s+feel\b/,
+    /(?:^|\b)what'?s\s+up\s+with\s+you\b/
   ];
 
   if (aiCheckinPatterns.some(pattern => pattern.test(cleaned))) {

@@ -283,3 +283,4 @@ Make sure your daily check-in is logged before you sleep. Tomorrow we push the c
 Whether you want a breakdown of today's curriculum, technical advice on After Effects or n8n, or just a quick reset, I'm ready. What's on your mind?`;
   }
 }
+
